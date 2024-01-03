@@ -69,5 +69,5 @@ def predict_loan_status_logic(ApplicantIncome, Gender, Married, Dependents, Educ
     else:
         return "Yes"
 
-if __name__ == '__main__':
-    app.run(port=5000)  # Run Flask app on a specific port
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=8080)  # Example port, adjust as needed
