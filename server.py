@@ -7,9 +7,16 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import json
 from bson import ObjectId
-
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import (
+    JWTManager, jwt_required, create_access_token,
+    get_jwt_identity, unset_jwt_cookies
+)
 app = Flask(__name__)
 API_KEY = 'LPSIBD'
+# Initialize JWT manager
+app.config['JWT_SECRET_KEY'] = 'HAMZA_ELHAIKI'  # Replace with a secure secret key
+jwt = JWTManager(app)
 
 
 loaded_model = joblib.load('logistic_regression_model.pkl')
@@ -18,6 +25,7 @@ uri = "mongodb+srv://agile:agile@cluster0.xkmpvai.mongodb.net/"
 client = MongoClient(uri, server_api=ServerApi('1'))
 db = client.get_database('pred1')  # Replace 'mydatabase' with your database name
 collection = db['Loan_data']  # Replace 'mycollection' with your collection name
+users_collection = db['Users']  # Replace 'Users' with your collection name for user data
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -132,6 +140,67 @@ def predict_loan_status_logic(ApplicantIncome, Gender, Married, Dependents, Educ
         return "No"
     else:
         return "Yes"
+
+bcrypt = Bcrypt(app)
+
+@app.route('/register', methods=['POST'])
+def register():
+    try:
+        # Get the JSON data from the POST request
+        request_data = request.get_json()
+
+        # Check if the username or email already exists
+        existing_user = users_collection.find_one({
+            '$or': [
+                {'username': request_data.get('username')},
+                {'email': request_data.get('email')}
+            ]
+        })
+
+        if existing_user:
+            return jsonify({'message': 'Username or email already exists'}), 400
+
+        # Hash the password before storing it
+        hashed_password = bcrypt.generate_password_hash(request_data.get('password')).decode('utf-8')
+
+        # Prepare user data to insert into the MongoDB collection
+        user_data = {
+            'username': request_data.get('username'),
+            'email': request_data.get('email'),
+            'password': hashed_password  # Store the hashed password
+            # Add other relevant user data here
+        }
+
+        # Insert the user data into the Users collection
+        users_collection.insert_one(user_data)
+
+        return jsonify({'message': 'User created successfully'}), 201
+    except Exception as e:
+        return jsonify({'message': 'Failed to create user', 'error': str(e)}), 500
+
+@app.route('/login', methods=['POST'])
+def login():
+    try:
+        # Get the JSON data from the POST request
+        request_data = request.get_json()
+
+        # Find the user by username or email
+        user = users_collection.find_one({
+            '$or': [
+                {'username': request_data.get('username')},
+                {'email': request_data.get('email')}
+            ]
+        })
+
+        if user and bcrypt.check_password_hash(user['password'], request_data.get('password')):
+            # Authentication successful
+            return jsonify({'message': 'Login successful'}), 200
+        else:
+            # Authentication failed
+            return jsonify({'message': 'Invalid credentials'}), 401
+    except Exception as e:
+        return jsonify({'message': 'Failed to authenticate', 'error': str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080)  # Example port, adjust as needed
