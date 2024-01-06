@@ -2,12 +2,28 @@ from flask import Flask, jsonify, request
 import joblib
 import pandas as pd
 from functools import wraps 
+from pymongo import MongoClient
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+import json
+from bson import ObjectId
 
 app = Flask(__name__)
 API_KEY = 'LPSIBD'
 
 
 loaded_model = joblib.load('logistic_regression_model.pkl')
+
+uri = "mongodb+srv://agile:agile@cluster0.xkmpvai.mongodb.net/"
+client = MongoClient(uri, server_api=ServerApi('1'))
+db = client.get_database('pred1')  # Replace 'mydatabase' with your database name
+collection = db['Loan_data']  # Replace 'mycollection' with your collection name
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return json.JSONEncoder.default(self, o)
 
 def require_api_key(view_function):
     @wraps(view_function)
@@ -20,6 +36,54 @@ def require_api_key(view_function):
         return view_function(*args, **kwargs)
 
     return decorated_function
+
+@app.route('/save_loan_data', methods=['POST'])
+def save_loan_data():
+    try:
+        # Get the JSON data from the POST request
+        request_data = request.get_json()
+        # Extract required fields from the JSON data
+        data_to_insert = {
+            'id_user': request_data.get('id_user'),
+            'ApplicantIncome': request_data.get('ApplicantIncome'),
+            'Gender': request_data.get('Gender'),
+            'Married': request_data.get('Married'),
+            'Dependents': request_data.get('Dependents'),
+            'Education': request_data.get('Education'),
+            'Self_Employed': request_data.get('Self_Employed'),
+            'CoapplicantIncome': request_data.get('CoapplicantIncome'),
+            'LoanAmount': request_data.get('LoanAmount'),
+            'Loan_Amount_Term': request_data.get('Loan_Amount_Term'),
+            'Credit_History': request_data.get('Credit_History'),
+            'Property_Area': request_data.get('Property_Area'),
+            'LoanStatus': request_data.get('LoanStatus')
+        }
+
+        # Insert data into the MongoDB collection
+        collection.insert_one(data_to_insert)
+
+        return jsonify({'message': 'Data saved successfully'}), 200
+    except Exception as e:
+        return jsonify({'message': 'Failed to save data', 'error': str(e)}), 500
+
+@app.route('/get_loan_data/<user_id>', methods=['GET'])
+def get_data_by_id(user_id):
+    try:
+        # Find all data based on the provided user ID
+        cursor = collection.find({'id_user': user_id})
+
+        # Convert the cursor to a list of dictionaries with ObjectId converted to string
+        data_list = json.loads(json.dumps(list(cursor), cls=CustomJSONEncoder))
+
+        if data_list:
+            return jsonify({'message': 'Data found', 'data': data_list}), 200
+        else:
+            return jsonify({'message': 'No data found for the user ID'}), 404
+
+    except Exception as e:
+        return jsonify({'message': 'Failed to fetch data', 'error': str(e)}), 500
+
+
 @app.route('/predictLoanStatus', methods=['POST'])
 @require_api_key
 def predict_loan_status():
