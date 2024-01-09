@@ -208,6 +208,10 @@ def login():
     except Exception as e:
         return jsonify({'message': 'Failed to authenticate', 'error': str(e)}), 500
 
-
+@app.route('/logout', methods=['POST'])
+def logout():
+    resp = jsonify({'message': 'Logout successful'})
+    unset_jwt_cookies(resp)
+    return resp, 200
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080)  # Example port, adjust as needed
