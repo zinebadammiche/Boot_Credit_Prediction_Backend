@@ -168,7 +168,6 @@ def register():
             'username': request_data.get('username'),
             'email': request_data.get('email'),
             'password': hashed_password  # Store the hashed password
-            # Add other relevant user data here
         }
 
         # Insert the user data into the Users collection
@@ -178,6 +177,11 @@ def register():
     except Exception as e:
         return jsonify({'message': 'Failed to create user', 'error': str(e)}), 500
 
+@app.route('/current_user', methods=['GET'])
+@jwt_required()
+def current_user():
+    current_user_id = get_jwt_identity()
+    return jsonify({'user_id': current_user_id}), 200
 @app.route('/login', methods=['POST'])
 def login():
     try:
@@ -193,9 +197,11 @@ def login():
         })
 
         if user and bcrypt.check_password_hash(user['password'], request_data.get('password')):
-            # Authentication successful
-            user_id = str(user['_id'])  # Retrieve the user's ObjectId and convert it to string
-            return jsonify({'message': 'Login successful', 'user_id': user_id}), 200
+            # Authentication successful, generate JWT token
+            access_token = create_access_token(identity=str(user['_id']))
+
+            # Return the token as a response
+            return jsonify({'access_token': access_token}), 200
         else:
             # Authentication failed
             return jsonify({'message': 'Invalid credentials'}), 401
