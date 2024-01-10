@@ -8,12 +8,18 @@ from pymongo.server_api import ServerApi
 import json
 from bson import ObjectId
 from flask_bcrypt import Bcrypt
+from flask_cors import CORS
 from flask_jwt_extended import (
     JWTManager, jwt_required, create_access_token,
     get_jwt_identity, unset_jwt_cookies
 )
+
+
 app = Flask(__name__)
+CORS(app)
 API_KEY = 'LPSIBD'
+
+CORS(app, origins=["localhost:8080" ])
 # Initialize JWT manager
 app.config['JWT_SECRET_KEY'] = 'HAMZA_ELHAIKI'  # Replace with a secure secret key
 jwt = JWTManager(app)
@@ -53,18 +59,18 @@ def save_loan_data():
         # Extract required fields from the JSON data
         data_to_insert = {
             'id_user': request_data.get('id_user'),
-            'ApplicantIncome': request_data.get('ApplicantIncome'),
-            'Gender': request_data.get('Gender'),
-            'Married': request_data.get('Married'),
-            'Dependents': request_data.get('Dependents'),
-            'Education': request_data.get('Education'),
-            'Self_Employed': request_data.get('Self_Employed'),
-            'CoapplicantIncome': request_data.get('CoapplicantIncome'),
-            'LoanAmount': request_data.get('LoanAmount'),
-            'Loan_Amount_Term': request_data.get('Loan_Amount_Term'),
-            'Credit_History': request_data.get('Credit_History'),
-            'Property_Area': request_data.get('Property_Area'),
-            'LoanStatus': request_data.get('LoanStatus')
+            'ApplicantIncome': request_data.get('applicantIncome'),
+            'Gender': request_data.get('gender'),
+            'Married': request_data.get('married'),
+            'Dependents': request_data.get('dependents'),
+            'Education': request_data.get('education'),
+            'Self_Employed': request_data.get('selfEmployed'),
+            'CoapplicantIncome': request_data.get('coapplicantIncome'),
+            'LoanAmount': request_data.get('loanAmount'),
+            'Loan_Amount_Term': request_data.get('loanTerm'),
+            'Credit_History': request_data.get('creditHistory'),
+            'Property_Area': request_data.get('propertyArea'),
+            'LoanStatus': request_data.get('loanStatus')
         }
 
         # Insert data into the MongoDB collection
@@ -97,25 +103,26 @@ def get_data_by_id(user_id):
 def predict_loan_status():
     data = request.json
     # Extract input data from request
-    ApplicantIncome = data.get('ApplicantIncome')
-    Gender = data.get('Gender')
-    Married = data.get('Married')
-    Dependents = data.get('Dependents')
-    Education = data.get('Education')
-    Self_Employed = data.get('Self_Employed')
-    CoapplicantIncome = data.get('CoapplicantIncome')
-    LoanAmount = data.get('LoanAmount')
-    Loan_Amount_Term = data.get('Loan_Amount_Term')
-    Credit_History = data.get('Credit_History')
-    Property_Area = data.get('Property_Area')
+ 
+    Gender = data.get('gender')
+    Married = data.get('married')
+    Dependents = data.get('dependents')
+    Education = data.get('education')
+    Self_Employed = data.get('selfEmployed')
+    ApplicantIncome = data.get('applicantIncome')
+    CoapplicantIncome = data.get('coapplicantIncome')
+    LoanAmount = data.get('loanAmount')
+    Loan_Amount_Term = data.get('loanTerm')
+    Credit_History = data.get('creditHistory')
+    Property_Area = data.get('propertyArea')
 
     # Call prediction function
-    prediction = predict_loan_status_logic(ApplicantIncome, Gender, Married, Dependents, Education, Self_Employed, CoapplicantIncome, LoanAmount, Loan_Amount_Term, Credit_History, Property_Area)
+    prediction = predict_loan_status_logic( Gender, Married, Dependents, Education, Self_Employed,ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, Credit_History, Property_Area)
 
     # Return prediction as JSON response
     return jsonify({"prediction": prediction})
 
-def predict_loan_status_logic(ApplicantIncome, Gender, Married, Dependents, Education, Self_Employed, CoapplicantIncome, LoanAmount, Loan_Amount_Term, Credit_History, Property_Area):
+def predict_loan_status_logic( Gender, Married, Dependents, Education, Self_Employed,ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, Credit_History, Property_Area):
     # Create a DataFrame with the user input
     user_input = pd.DataFrame({
         'Gender': [int(Gender)],
@@ -201,12 +208,13 @@ def login():
             access_token = create_access_token(identity=str(user['_id']))
 
             # Return the token as a response
-            return jsonify({'access_token': access_token}), 200
+            return jsonify({'access_token': access_token, 'username': user['username']}), 200
         else:
             # Authentication failed
             return jsonify({'message': 'Invalid credentials'}), 401
     except Exception as e:
         return jsonify({'message': 'Failed to authenticate', 'error': str(e)}), 500
+
 
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -214,4 +222,4 @@ def logout():
     unset_jwt_cookies(resp)
     return resp, 200
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)  # Example port, adjust as needed
+    app.run(host='0.0.0.0', port=5000)  # Example port, adjust as needed
